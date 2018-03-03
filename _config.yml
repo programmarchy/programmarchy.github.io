@@ -1,0 +1,29 @@
+name: Donald Ness
+description: Development Blog
+avatar: https://avatars0.githubusercontent.com/u/622192
+
+footer-links:
+  github: programmarchy
+  rss: rss
+
+url: https://programmarchy.github.io
+
+version: 3.6.2
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: 'highlight'
+
+sass:
+  style: :expanded
+
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  

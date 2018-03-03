@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Weird bug with touch events in a UITableView with dynamic cell heights – Donald Ness – Development Blog</title>
+
+        <meta charset="utf-8" />
+    <meta content='text/html; charset=utf-8' http-equiv='Content-Type'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'>
+
+    
+    <meta name="description" content="Recently I solved an interesting iOS bug where the controls inside table view cells seemed to be receiving touch events in the wrong frame. Here’s a clip of the bug in action:
+
+" />
+    <meta property="og:description" content="Recently I solved an interesting iOS bug where the controls inside table view cells seemed to be receiving touch events in the wrong frame. Here’s a clip of the bug in action:
+
+" />
+    
+    <meta name="author" content="Donald Ness" />
+
+    
+    <meta property="og:title" content="Weird bug with touch events in a UITableView with dynamic cell heights" />
+    <meta property="twitter:title" content="Weird bug with touch events in a UITableView with dynamic cell heights" />
+    
+
+    <!--[if lt IE 9]>
+      <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="alternate" type="application/rss+xml" title="Donald Ness - Development Blog" href="/feed.xml" />
+
+    <!-- Created with Jekyll Now - http://github.com/barryclark/jekyll-now -->
+  </head>
+
+  <body>
+    <div class="wrapper-masthead">
+      <div class="container">
+        <header class="masthead clearfix">
+          <a href="/" class="site-avatar"><img src="https://avatars0.githubusercontent.com/u/622192" /></a>
+
+          <div class="site-info">
+            <h1 class="site-name"><a href="/">Donald Ness</a></h1>
+            <p class="site-description">Development Blog</p>
+          </div>
+        </header>
+      </div>
+    </div>
+
+    <div id="main" role="main" class="container">
+      <article class="post">
+  <h1>Weird bug with touch events in a UITableView with dynamic cell heights</h1>
+
+  <div class="entry">
+    <p>Recently I solved an interesting iOS bug where the controls inside table view cells seemed to be receiving touch events in the wrong frame. Here’s a clip of the bug in action:</p>
+
+<p><img src="http://localhost:4000/assets/2018-3-3-clip1.gif" alt="Touch events translated below the control gives an illusion of touches on one slider causing a slider in an above cell to move instead" /></p>
+
+<p>In the clip, a user is touches one slider but a different slider in a cell above moves.</p>
+
+<p>Initially, I thought the cell wasn’t being properly recycled, or the view model was mapped to the wrong index path. Instead, the correct slider was being controlled, but it was being controlled from touches in the view that were offset from its displayed frame on the screen. Furthermore, once the table view was reloaded, things returned to normal and touches were registered in the correct frame.</p>
+
+<p>Because the cell heights were dynamic, I had to override <code class="highlighter-rouge">tableView:heightForRowAt:</code>, and I also implemented <code class="highlighter-rouge">tableView:estimatedHeightForRowAt:</code>. The cells had constraint-based animations to expand when they were selected, and collapse when deselected. Here were the original implementations:</p>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">func</span> <span class="nf">tableView</span><span class="p">(</span><span class="n">_</span> <span class="nv">tableView</span><span class="p">:</span> <span class="kt">UITableView</span><span class="p">,</span> <span class="n">estimatedHeightForRowAt</span> <span class="nv">indexPath</span><span class="p">:</span> <span class="kt">IndexPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">CGFloat</span> <span class="p">{</span>
+  <span class="k">let</span> <span class="nv">viewModel</span> <span class="o">=</span> <span class="n">lightViewModels</span><span class="p">[</span><span class="n">indexPath</span><span class="o">.</span><span class="n">row</span><span class="p">]</span>
+  
+  <span class="k">if</span> <span class="n">viewModel</span><span class="o">.</span><span class="n">isDimmer</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kt">SceneLightDimmerCell</span><span class="o">.</span><span class="n">estimatedHeight</span> <span class="c1">// 140</span>
+  <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kt">SceneLightSwitchCell</span><span class="o">.</span><span class="n">estimatedHeight</span> <span class="c1">// 96</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nf">tableView</span><span class="p">(</span><span class="n">_</span> <span class="nv">tableView</span><span class="p">:</span> <span class="kt">UITableView</span><span class="p">,</span> <span class="n">heightForRowAt</span> <span class="nv">indexPath</span><span class="p">:</span> <span class="kt">IndexPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">CGFloat</span> <span class="p">{</span>
+  <span class="k">let</span> <span class="nv">viewModel</span> <span class="o">=</span> <span class="n">lightViewModels</span><span class="p">[</span><span class="n">indexPath</span><span class="o">.</span><span class="n">row</span><span class="p">]</span>
+  
+  <span class="k">if</span> <span class="n">viewModel</span><span class="o">.</span><span class="n">isDimmer</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kt">SceneLightDimmerCell</span><span class="o">.</span><span class="nf">heightWhenSelected</span><span class="p">(</span><span class="nf">isRowSelected</span><span class="p">(</span><span class="nv">at</span><span class="p">:</span> <span class="n">indexPath</span><span class="p">))</span> <span class="c1">// ? 140 : 96</span>
+  <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kt">SceneLightSwitchCell</span><span class="o">.</span><span class="nf">heightWhenSelected</span><span class="p">(</span><span class="nf">isRowSelected</span><span class="p">(</span><span class="nv">at</span><span class="p">:</span> <span class="n">indexPath</span><span class="p">))</span> <span class="c1">// ? 96 : 44</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>For <code class="highlighter-rouge">tableView:estimatedHeightForRowAt:</code>, I provided a “simpler” implementation, which did not account for the selection. This was exactly the problem. When the table view is first drawn, it uses the estimate to optimize table drawing. From <a href="https://developer.apple.com/documentation/uikit/uitableviewdelegate/1614926-tableview">the Apple Documentation</a>:</p>
+
+<blockquote>
+  <p>Providing an estimate the height of rows can improve the user experience when loading the table view. If the table contains variable height rows, it might be expensive to calculate all their heights and so lead to a longer load time. Using estimation allows you to defer some of the cost of geometry calculation from load time to scrolling time.</p>
+</blockquote>
+
+<p>Even though the table view appeared to have the correct layout, the touch coordinates were not mapping to the correct cells in the table view. However, this only happened if the table view had some selected (expanded) cells. Instead, they mapped to coordinates that would be correct <em>if all the cells were in the collapsed state</em>. Sure enough, deleting the <code class="highlighter-rouge">estimatedHeightForRow:atIndexPath:</code> implementation, solely relying on the <code class="highlighter-rouge">heightForRow:atIndexPath:</code>, resolved the issue:</p>
+
+<p>The errors in the estimate implementation stacked up enough pixels in the y-dimension such that the mapping from touch coordinates to cell indexes was shifted.</p>
+
+<p><img src="http://localhost:4000/assets/2018-3-3-diagram1.png" alt="A side by side comparison of height and height estimate implementations" /></p>
+
+<p>I’m not sure if this bug is my fault, or Apple’s fault, but I am sure that this is an example of premature optimization causing a costly issue. However, the mistake was an instructive lesson about how table views map touch and drawing coordinates to cells.</p>
+
+<p>In conclusion, it’s not a good idea to implement <code class="highlighter-rouge">estimatedHeightForRow:atIndexPath:</code> unless you actually need to optimize loading your table view. In this case, it was unnecessary because cell heights could be cheaply calculated. If calculating cell heights is expensive (e.g. loading rich content or calculating complex geometry), then it’d be worth estimating cell heights. But be wary that there can be side effects if your estimate is too inaccurate!</p>
+
+  </div>
+
+  <div class="date">
+    Written on March  3, 2018
+  </div>
+
+  
+</article>
+
+    </div>
+
+    <div class="wrapper-footer">
+      <div class="container">
+        <footer class="footer">
+          
+
+
+
+<a href="https://github.com/programmarchy"><i class="svg-icon github"></i></a>
+
+
+
+<a href="/feed.xml"><i class="svg-icon rss"></i></a>
+
+
+
+
+        </footer>
+      </div>
+    </div>
+
+    
+
+  </body>
+</html>
